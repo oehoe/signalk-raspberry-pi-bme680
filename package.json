@@ -1,0 +1,26 @@
+{
+  "name": "signalk-raspberry-pi-bme680",
+  "author": "Johan den Uijl",
+  "description": "SignalK node server plugin that reads data from bme680 temperature/humidity/barometer sensors on Raspberry-Pi",
+  "license": "MIT",
+  "homepage": "https://github.com/oehoe/signalk-raspberry-pi-bme680#readme",
+  "version": "0.0.1",
+  "main": "index.js",
+  "keywords": [
+    "signalk-node-server-plugin"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/oehoe/signalk-raspberry-pi-bme680.git"
+  },
+  "bugs": {
+    "url": "https://github.com/oehoe/signalk-raspberry-pi-bme680/issues"
+  },
+  "dependencies": {
+    "bme680-sensor": "1.0.0"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  }
+}
