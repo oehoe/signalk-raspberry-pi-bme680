@@ -1,10 +1,7 @@
 /*
- * Copyright 2019 Jeremy Carter <jncarter@hotmail.com>
- *
- * Add the MIT license
+ * 2020 J den Uijl
  */
 
-// const { Bme680 } = require('bme680-sensor');
 
 const { Bme680 } = require('bme680-sensor')
 
@@ -71,8 +68,6 @@ module.exports = function (app) {
       }
     }
 
-    //'use strict';
-
     const bme680 = new Bme680(options.i2c_bus || 1, Number(options.i2c_address || '0x77'));
     //const bme680 = new Bme680(1, 0x77);
 
@@ -80,51 +75,34 @@ module.exports = function (app) {
     function readSensorData() {
 
       bme680.initialize().then(async () => {
-        console.log('Sensor initialized');
+        app.debug('BME680 Sensor initialized');
         timer = setInterval(async () => {
-            var sensorData = await bme680.getSensorData();
-            temperature = sensorData.data.temperature;
-            pressure = sensorData.data.pressure;
-            humidity = sensorData.data.humidity;
+            try {
+              var sensorData = await bme680.getSensorData();
+              temperature = sensorData.data.temperature;
+              pressure = sensorData.data.pressure;
+              humidity = sensorData.data.humidity;
 
-            // create message
-            var delta = createDeltaMessage(temperature, humidity, pressure);
+              // create message
+              var delta = createDeltaMessage(temperature, humidity, pressure);
 
-            // send temperature
-            app.handleMessage(plugin.id, delta);
+              // send data
+              app.handleMessage(plugin.id, delta);
+
+            } catch(err) {
+              var delta = createDeltaMessage(null, null, null);
+              app.handleMessage(plugin.id, delta);
+            }
 
         }, options.rate * 1000);
-      });
-
-  	  /*bme280.readSensorData()
-          .then((data) => {
-        // temperature_C, pressure_hPa, and humidity are returned by default.
-        temperature = data.temperature_C + 273.15;
-        pressure = data.pressure_hPa * 100;
-        humidity = data.humidity;
-
-        //console.log(`data = ${JSON.stringify(data, null, 2)}`);
-
-        // create message
-        var delta = createDeltaMessage(temperature, humidity, pressure)
-
-        // send temperature
-        app.handleMessage(plugin.id, delta)
-
       })
       .catch((err) => {
-        console.log(`BME680 read error: ${err}`);
-      });*/
+        app.debug('Unable to initialize BME680');
+        var delta = createDeltaMessage(null, null, null);
+        app.handleMessage(plugin.id, delta);
+      });
     }
-
-    /*bme680.init()
-        .then(() => {
-      console.log('BME680 initialization succeeded');
-      readSensorData();
-    })
-    .catch((err) => console.error(`BME680 initialization failed: ${err} `));*/
-
-    //timer = setInterval(readSensorData, options.rate * 1000);
+    app.debug("Started Plugin BME680");
     readSensorData();
   }
 
