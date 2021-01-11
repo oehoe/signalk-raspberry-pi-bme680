@@ -79,8 +79,8 @@ module.exports = function (app) {
         timer = setInterval(async () => {
             try {
               var sensorData = await bme680.getSensorData();
-              temperature = sensorData.data.temperature;
-              pressure = sensorData.data.pressure;
+              temperature = sensorData.data.temperature + 273.15;
+              pressure = sensorData.data.pressure * 100;
               humidity = sensorData.data.humidity;
 
               // create message
