@@ -99,10 +99,10 @@ module.exports = function (app) {
                 'path': 'environment.' + options.path + '.pressure',
                 'value': pressure
               }, {
-                'path': 'environment.' + options.path4 + '.gas_resistance',
+                'path': 'environment.' + options.path4 + '.gas',
                 'value': gas_resistance
               }, {
-                'path': 'environment.' + options.path4 + '.air_quality_index',
+                'path': 'environment.' + options.path4 + '.airquality',
                 'value': air_quality_index
               }
             ]
