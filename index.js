@@ -11,7 +11,7 @@ module.exports = function (app) {
 
   plugin.id = 'signalk-raspberry-pi-bme680'
   plugin.name = 'Raspberry-Pi BME680'
-  plugin.description = 'BME680 temperature, pressure and humidity sensors on Raspberry-Pi'
+  plugin.description = 'BME680 temperature, pressure, humidity and air quality sensors on Raspberry-Pi'
 
   plugin.schema = {
     type: 'object',
@@ -76,7 +76,7 @@ module.exports = function (app) {
       },
     }
   }
-	
+
   plugin.start = function (options) {
     
     function createDeltaMessage (temperature, humidity, pressure, gas_resistance, air_quality_index) {
@@ -113,7 +113,7 @@ module.exports = function (app) {
 
     const bme680 = new Bme680(options.i2c_bus || 1, Number(options.i2c_address || '0x77'));
     //const bme680 = new Bme680(1, 0x77);
-
+    
     var gas_baseline;
     var burn_in_data = [];
     
@@ -157,8 +157,7 @@ module.exports = function (app) {
       // stop the burn in
       clearInterval(burnin);
     }
-    
-	  
+  
     // Read BME680 sensor data
     function readSensorData() {
 
@@ -170,7 +169,7 @@ module.exports = function (app) {
           humidity = sensorData.data.humidity;
           gas_resistance = sensorData.data.gas_resistance;
           hum_offset = humidity - options.hum_baseline;
-	  gas_offset = gas_baseline - gas_resistance;
+          gas_offset = gas_baseline - gas_resistance;
               
           // calculate hum_score as the distance from the hum_baseline
           if (hum_offset > 0) {
@@ -178,7 +177,7 @@ module.exports = function (app) {
           } else {
               hum_score = (options.hum_baseline + hum_offset) / options.hum_baseline * (options.hum_weighting);
           }
-              
+            
           // calculate gas_score as the distance from the gas_baseline
           if (gas_offset > 0) {
               gas_score = (gas_resistance / gas_baseline) * (100 - options.hum_weighting);
@@ -190,14 +189,14 @@ module.exports = function (app) {
           air_quality_score = hum_score + gas_score;
           // convert to Air Quality Index
           air_quality_index = Math.round(500 - (5 * air_quality_score));
-             
+
           // create message
           var delta = createDeltaMessage(temperature, humidity, pressure, gas_resistance, air_quality_index);
 
           // send data
           app.handleMessage(plugin.id, delta);
 
-	} catch(err) {
+        } catch(err) {
           var delta = createDeltaMessage(null, null, null, null, null);
           app.handleMessage(plugin.id, delta);
         }
