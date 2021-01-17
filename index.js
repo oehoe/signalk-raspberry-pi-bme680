@@ -17,14 +17,14 @@ module.exports = function (app) {
     type: 'object',
     properties: {
       rate: {
-        title: "Sample Rate (in seconds)",
+        title: 'Sample Rate (in seconds)',
+        description: 'Time between readings',
         type: 'number',
-        description: 'You may consider a longer time but be aware that the burn in periode for the air quality requires at least 60 readings.',
         default: 5
       },
       burn_in_time: {
         title: 'Burn in time (in seconds)',
-        description: 'Defines the time the sensor will heat up until using the gas data for air quality index',
+        description: 'Defines the time the sensor will heat up to calculate the gas baseline. Default: 500',
         type: 'number',
         default: 500
       },
@@ -76,7 +76,7 @@ module.exports = function (app) {
       },
     }
   }
-
+	
   plugin.start = function (options) {
     
     function createDeltaMessage (temperature, humidity, pressure, gas_resistance, air_quality_index) {
@@ -90,13 +90,13 @@ module.exports = function (app) {
             'timestamp': (new Date()).toISOString(),
             'values': [
               {
-                'path': 'environment.' + options.path + '.temperature',
+                'path': 'environment.' + options.path1 + '.temperature',
                 'value': temperature
               }, {
-                'path': 'environment.' + options.path + '.humidity',
+                'path': 'environment.' + options.path2 + '.humidity',
                 'value': humidity
               }, {
-                'path': 'environment.' + options.path + '.pressure',
+                'path': 'environment.' + options.path3 + '.pressure',
                 'value': pressure
               }, {
                 'path': 'environment.' + options.path4 + '.gas',
@@ -114,66 +114,33 @@ module.exports = function (app) {
     const bme680 = new Bme680(options.i2c_bus || 1, Number(options.i2c_address || '0x77'));
     //const bme680 = new Bme680(1, 0x77);
 
-    var gas_baseline = 0;
+    var gas_baseline;
     var burn_in_data = [];
     
-    // Read BME680 sensor data
-    function readSensorData() {
-
+    // Sensor initialization and burn in periode
+    function SensorBurnIn() {
+    
       bme680.initialize().then(async () => {
         app.debug('BME680 Sensor initialized');
-        timer = setInterval(async () => {
-            try {
+        burnin = setInterval(async () => {
+          try {
               var sensorData = await bme680.getSensorData();
               temperature = sensorData.data.temperature + 273.15;
               pressure = sensorData.data.pressure * 100;
               humidity = sensorData.data.humidity;
               gas_resistance = sensorData.data.gas_resistance;
-              hum_offset = humidity - options.hum_baseline;
-	      
-              // calculate hum_score as the distance from the hum_baseline
-              if (hum_offset > 0) {
-                  hum_score = (100 - options.hum_baseline - hum_offset) / (100 - options.hum_baseline) * (options.hum_weighting);
-              } else {
-                  hum_score = (options.hum_baseline + hum_offset) / options.hum_baseline * (options.hum_weighting);
-              }
-              
-              // calculate gas baseline     
-              if ((burn_in_data.length < (options.burn_in_time / options.rate)) || (burn_in_data.length < 60)) {
-                  burn_in_data.push(gas_resistance);
-                  gas_offset = 0;
-              } else if (gas_baseline == 0) {
-                  gas_baseline = burn_in_data.slice(-50).reduce((a, b) => a + b) / burn_in_data.slice(-50).length;
-                  gas_offset = gas_baseline - gas_resistance;
-              }
-
-              // calculate gas_score as the distance from the gas_baseline
-              if (gas_baseline > 0) {
-                  gas_offset = gas_baseline - gas_resistance;
-              }
-              if (gas_offset > 0) {
-                  gas_score = (gas_resistance / gas_baseline) * (100 - options.hum_weighting);
-              } else {
-                gas_score = 100 - options.hum_weighting;
-              }
-
-              // calculate air_quality_score
-              air_quality_score = hum_score + gas_score;
-              // convert to Air Quality Index
-              air_quality_index = Math.round(500 - (5 * air_quality_score));
+              burn_in_data.push(gas_resistance);
               
               // create message
-              var delta = createDeltaMessage(temperature, humidity, pressure, gas_resistance, air_quality_index);
-
+              var delta = createDeltaMessage(temperature, humidity, pressure, gas_resistance, null);
+              
               // send data
               app.handleMessage(plugin.id, delta);
-
-            } catch(err) {
+          } catch(err) {
               var delta = createDeltaMessage(null, null, null, null, null);
               app.handleMessage(plugin.id, delta);
-            }
-
-        }, options.rate * 1000);
+          }
+        }, 1000);
       })
       .catch((err) => {
         app.debug('Unable to initialize BME680');
@@ -181,8 +148,67 @@ module.exports = function (app) {
         app.handleMessage(plugin.id, delta);
       });
     }
+    
+    // End of the burn in periode
+    function EndBurnIn() {
+      
+      // calculate gas baseline     
+      gas_baseline = burn_in_data.slice(-50).reduce((a, b) => a + b) / burn_in_data.slice(-50).length;
+      // stop the burn in
+      clearInterval(burnin);
+    }
+    
+	  
+    // Read BME680 sensor data
+    function readSensorData() {
+
+      timer = setInterval(async () => {
+        try {
+          var sensorData = await bme680.getSensorData();
+          temperature = sensorData.data.temperature + 273.15;
+          pressure = sensorData.data.pressure * 100;
+          humidity = sensorData.data.humidity;
+          gas_resistance = sensorData.data.gas_resistance;
+          hum_offset = humidity - options.hum_baseline;
+	  gas_offset = gas_baseline - gas_resistance;
+              
+          // calculate hum_score as the distance from the hum_baseline
+          if (hum_offset > 0) {
+              hum_score = (100 - options.hum_baseline - hum_offset) / (100 - options.hum_baseline) * (options.hum_weighting);
+          } else {
+              hum_score = (options.hum_baseline + hum_offset) / options.hum_baseline * (options.hum_weighting);
+          }
+              
+          // calculate gas_score as the distance from the gas_baseline
+          if (gas_offset > 0) {
+              gas_score = (gas_resistance / gas_baseline) * (100 - options.hum_weighting);
+          } else {
+            gas_score = 100 - options.hum_weighting;
+          }
+
+          // calculate air_quality_score
+          air_quality_score = hum_score + gas_score;
+          // convert to Air Quality Index
+          air_quality_index = Math.round(500 - (5 * air_quality_score));
+             
+          // create message
+          var delta = createDeltaMessage(temperature, humidity, pressure, gas_resistance, air_quality_index);
+
+          // send data
+          app.handleMessage(plugin.id, delta);
+
+	} catch(err) {
+          var delta = createDeltaMessage(null, null, null, null, null);
+          app.handleMessage(plugin.id, delta);
+        }
+
+      }, options.rate * 1000);
+    }
+    
     app.debug("Started Plugin BME680");
-    readSensorData();
+    setTimeout(EndBurnIn, options.burn_in_time * 1000);
+    SensorBurnIn();
+    setTimeout(readSensorData, (options.burn_in_time + 1) * 1000);
   }
 
   plugin.stop = function () {
