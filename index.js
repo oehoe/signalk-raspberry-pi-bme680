@@ -127,7 +127,7 @@ module.exports = function (app) {
               var sensorData = await bme680.getSensorData();
               temperature = sensorData.data.temperature + 273.15;
               pressure = sensorData.data.pressure * 100;
-              humidity = sensorData.data.humidity;
+              humidity = sensorData.data.humidity / 100;
               gas_resistance = sensorData.data.gas_resistance;
               burn_in_data.push(gas_resistance);
               
